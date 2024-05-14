@@ -34,3 +34,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# prisma
+prisma/migrations
+
+# keys
+welltrack-422720-83b6adfa9ac6.json
+cors-config.json

@@ -14,6 +14,9 @@ import {
   stripe,
 } from '@/lib/stripe'
 import { PLANS } from '@/config/stripe'
+import { Storage } from '@google-cloud/storage';
+
+const BUCKET_NAME = "welltrack_report_bucket";
 
 export const appRouter = router({
   authCallback: publicProcedure.query(async () => {
@@ -44,7 +47,6 @@ export const appRouter = router({
   }),
   getUserFiles: privateProcedure.query(async ({ ctx }) => {
     const { userId } = ctx
-
     return await db.file.findMany({
       where: {
         userId,
@@ -177,13 +179,13 @@ export const appRouter = router({
     }),
 
   getFile: privateProcedure
-    .input(z.object({ key: z.string() }))
+    .input(z.object({ id: z.string() }))
     .mutation(async ({ ctx, input }) => {
       const { userId } = ctx
 
       const file = await db.file.findFirst({
         where: {
-          key: input.key,
+          id: input.id,
           userId,
         },
       })
@@ -215,6 +217,38 @@ export const appRouter = router({
 
       return file
     }),
+  
+  getSignedUrl: privateProcedure
+    .input(z.object({ id: z.string() }))
+    .query(async ({ ctx, input }) => {
+
+      const { userId } = ctx
+      const file = await db.file.findFirst({
+        where: {
+          id: input.id,
+          userId,
+        },
+      })
+
+      if (!file) throw new TRPCError({ code: 'NOT_FOUND' })
+
+      const storage = new Storage({
+        projectId: 'welltrack-422720', 
+        keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS
+      });
+    
+      const bucket = storage.bucket(BUCKET_NAME);      
+      const fileRef = bucket.file(file.key);
+
+      // Generate a signed URL for reading the file
+      const [url] = await fileRef.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: Date.now() + 15 * 60 * 1000, // URL expires in 15 minutes
+      });
+      return url
+    }),
+  
 })
 
 export type AppRouter = typeof appRouter
